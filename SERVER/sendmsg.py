@@ -2,7 +2,7 @@ import socket
 import time
 import argparse
 
-IP   = "172.21.72.116"
+IP   = "172.21.72.126"
 PORT = 8080
 
 # msg = 0
