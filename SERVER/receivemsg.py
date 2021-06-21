@@ -9,16 +9,11 @@ PORT  = 8080
 
 listeningAddress = (IP, PORT)
 
-
-
-b = b''
 datagramSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 datagramSocket.bind(listeningAddress)
 
 while 1:
     localization, sourceAddress = datagramSocket.recvfrom(10000)
-    print("LEN: ", len(localization))
-    # print("MESSAGE : ", type(localization.decode('utf-8')))
     str_msg = localization.decode('utf-8')
     print("STR MSG: ", str_msg)
 
