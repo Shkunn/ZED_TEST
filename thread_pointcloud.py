@@ -243,6 +243,88 @@ def thread_pointcloud(params):
     zed.disable_positional_tracking()
     zed.close()
 
+def thread_pointcloud_firebase(params):
+
+    zed, image, pose, ser, sock, runtime, pymesh, objects, obj_runtime_param = params
+
+    last_call = time.time()
+
+    # Init time to get the FPS 
+    last_time = time.time()
+
+    points3D_dict              = {}
+    points3D_dict["3D_points"] = {}
+
+    limit_send_to_firebase = 0
+
+    key = ''
+    while key != 113:
+        # print("HZ SLAM THREAD    :", 1/(time.time() - last_time))
+        last_time = time.time()
+
+        # get image.
+        zed.grab(runtime)
+        zed.retrieve_image(image, sl.VIEW.LEFT)
+
+        #region GET MAPPING 3D POINTS
+
+        # get position and spatial mapping state.
+        zed.get_position(pose)
+        zed.get_spatial_mapping_state()
+
+        # get duration for time mapping.
+        duration = time.time() - last_call  
+        
+        if(duration > .05):
+            # -see if spatial mapping is available.
+            zed.request_spatial_map_async()
+        
+        if zed.get_spatial_map_request_status_async() == sl.ERROR_CODE.SUCCESS:
+            # -if spatial mapping is available go mapping.
+            zed.retrieve_spatial_map_async(pymesh)
+            last_call = time.time()
+
+        # a = pose.pose_data()
+        # pose2 = np.array([[a[0,0],a[0,1],a[0,2],a[0,3]],
+        #                   [a[1,0],a[1,1],a[1,2],a[1,3]],
+        #                   [a[2,0],a[2,1],a[2,2],a[2,3]],
+        #                   [a[3,0],a[3,1],a[3,2],a[3,3]]])
+
+        # cv2.imshow("ZED", image.get_data())
+        # key = cv2.waitKey(5)
+        
+        # In background, spatial mapping will use new images, depth and pose to create and update the mesh. No specific functions are required here.
+        mapping_state = zed.get_spatial_mapping_state()
+        # check param.
+        mapping_param = zed.get_spatial_mapping_parameters()
+    
+        # Print spatial mapping state and FPS
+        print("\rImages captured: {0} || {1} || {2} || {3}".format(mapping_state, mapping_param.resolution_meter, pymesh.vertices.shape[0], 1/(time.time() - last_time)))
+
+        if pymesh.vertices.shape[0] > limit_send_to_firebase:
+            mat_tolist = pymesh.vertices.tolist()
+
+            points3D_dict["3D_points"] = mat_tolist
+            
+            # print(points3D_dict)
+            
+            ref = db.reference('/')
+            ref.set(points3D_dict)
+
+            limit_send_to_firebase += 500
+
+
+
+        #endregion
+
+    # cv2.destroyAllWindows()
+
+    image.free(memory_type=sl.MEM.CPU)
+    # Disable modules and close camera
+    zed.disable_spatial_mapping()
+    zed.disable_positional_tracking()
+    zed.close()
+
 def thread_detection(params):
     """
         DESCRIPTION  : This thread will listen the camera zed sdk information and transfert
@@ -548,7 +630,7 @@ def both_thread_in_one(params):
     zed.disable_positional_tracking()
     zed.close()
 
-def thread_detection_firebase(params):
+def thread_detection_socket(params):
     """
         DESCRIPTION  : This thread will listen the camera zed sdk information and transfert
                        data to other thread. It will also send camera flux to server.
@@ -560,7 +642,7 @@ def thread_detection_firebase(params):
     # Init time to get the FPS 
     last_time = time.time()
 
-    human_dict = {}
+    human_dict               = {}
     human_dict["Human_pose"] = {}
 
     # Init object for the ZED camera
@@ -631,10 +713,6 @@ def thread_detection_firebase(params):
                         lineType)
                     
                     index += 1
-                
-                # print(human_dict)
-                # ref = db.reference('/')
-                # ref.set(human_dict)
 
                 json_msg = json.dumps(human_dict).encode('utf-8')
                 with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as opened_socket:
@@ -700,6 +778,7 @@ def thread_detection_firebase(params):
 
                 human_dict = {}
                 human_dict["Human_pose"] = {}
+        
         else:
             data_detection    = np.zeros(3)  
             
@@ -720,22 +799,25 @@ if __name__ == "__main__":
     lock = threading.Lock()
 
     # # Thread human detection.
-    # thread_1 = threading.Thread(target=thread_detection       , args=(params,))
+    # thread_1 = threading.Thread(target=thread_detection         , args=(params,))
     # thread_1.start()
-
 
     # Thread pointcloud.
     # thread_2 = threading.Thread(target=thread_pointcloud        , args=(params,))
     # thread_2.start()
 
     # # Thread both thread in one.
-    # thread_3 = threading.Thread(target=both_thread_in_one     , args=(params,))
+    # thread_3 = threading.Thread(target=both_thread_in_one       , args=(params,))
     # thread_3.start()
 
-    thread_4 = threading.Thread(target=thread_detection_firebase , args=(params,))
-    thread_4.start()
+    # thread_4 = threading.Thread(target=thread_detection_socket    , args=(params,))
+    # thread_4.start()
+
+    thread_5 = threading.Thread(target=thread_pointcloud_firebase , args=(params,))
+    thread_5.start()
     
     # thread_1.join()
     # thread_2.join()
     # thread_3.join()
-    thread_4.join()
+    # thread_4.join()
+    thread_5.join()
