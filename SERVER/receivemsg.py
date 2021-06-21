@@ -28,7 +28,7 @@ HEADERSIZE = 10
 
 
 # Define the IP address and the Port Number
-IP    = "172.21.72.133"
+IP    = "172.21.72.126"
 # IP    = "192.168.1.71"
 PORT  = 8080
 
@@ -43,7 +43,7 @@ datagramSocket.bind(listeningAddress)
 
 while 1:
     # print("hell")
-    localization, sourceAddress = datagramSocket.recvfrom(4096)
+    localization, sourceAddress = datagramSocket.recvfrom(10000)
     print("LEN: ", len(localization))
     # print("MESSAGE : ", type(localization.decode('utf-8')))
     str_msg = localization.decode('utf-8')
@@ -95,16 +95,3 @@ while 1:
 #     b += tmp
 # d = json.loads(b.decode('utf-8'))
 # print(d)
-
-
-
-def myreceive(self):
-    chunks = []
-    bytes_recd = 0
-    while bytes_recd < MSGLEN:
-        chunk = sock.recv(min(MSGLEN - bytes_recd, 2048))
-        if chunk == b'':
-            raise RuntimeError("socket connection broken")
-        chunks.append(chunk)
-        bytes_recd = bytes_recd + len(chunk)
-    return b''.join(chunks)

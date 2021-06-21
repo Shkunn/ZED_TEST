@@ -10,6 +10,16 @@ import threading
 import time
 # import ogl_viewer.viewer as gl
 
+import firebase_admin
+from firebase_admin import credentials
+from firebase_admin import db   
+import json
+
+cred = credentials.Certificate('FIREBASE/firebase_SDK.json')
+firebase_admin.initialize_app(cred, {
+    'databaseURL': 'https://rexinterface-default-rtdb.europe-west1.firebasedatabase.app/'
+})
+
 """
     INFO    : This is all Global variable.
 """
@@ -176,8 +186,14 @@ def thread_pointcloud(params):
 
     last_call = time.time()
 
+    # Init time to get the FPS 
+    last_time = time.time()
+
     key = ''
     while key != 113:
+        # print("HZ SLAM THREAD    :", 1/(time.time() - last_time))
+        last_time = time.time()
+
         # -get image.
         zed.grab(runtime)
         zed.retrieve_image(image, sl.VIEW.LEFT)
@@ -215,7 +231,7 @@ def thread_pointcloud(params):
         mapping_param = zed.get_spatial_mapping_parameters()
     
         # Print spatial mapping state and FPS
-        print("\rImages captured: {0} || {1} || {2}".format(mapping_state, mapping_param.resolution_meter, pymesh.vertices.shape[0]))
+        print("\rImages captured: {0} || {1} || {2} || {3}".format(mapping_state, mapping_param.resolution_meter, pymesh.vertices.shape[0], 1/(time.time() - last_time)))
 
         #endregion
 
@@ -297,6 +313,8 @@ def thread_detection(params):
                         lineType)
                     
                     index += 1
+
+                    # print("\rImages captured: {0} || {1}".format(point_A, point_D))
             
             if human_selected and check_if_search_id_is_present(id, objects): 
                 id = id_selected
@@ -334,14 +352,16 @@ def thread_detection(params):
                 data_detection[2] = len(objects.object_list)
         else:
             data_detection    = np.zeros(3)  
+        
+        print("\rImages captured: {0}".format(1/(time.time() - last_time)))
+        
+        # msg = "hello"
+        # cc = msg.encode()
+        # with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as opened_socket:
+        #     opened_socket.setblocking(0)
+        #     opened_socket.sendto(cc, SendAddress)
 
-        msg = "hello"
-        cc = msg.encode()
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as opened_socket:
-            opened_socket.setblocking(0)
-            opened_socket.sendto(cc, SendAddress)
-
-        print(msg)
+        # print(msg)
             
 
         # RESIZE WINDOW OTHERWISE STREAM TO SLOW 
@@ -528,6 +548,171 @@ def both_thread_in_one(params):
     zed.disable_positional_tracking()
     zed.close()
 
+def thread_detection_firebase(params):
+    """
+        DESCRIPTION  : This thread will listen the camera zed sdk information and transfert
+                       data to other thread. It will also send camera flux to server.
+    """
+
+    zed, image, pose, ser, sock, runtime, pymesh, objects, obj_runtime_param = params
+    global data_position, data_detection, keypoint_to_home, global_state, human_selected, id_selected, copy_image_stream, new_image, lock
+
+    # Init time to get the FPS 
+    last_time = time.time()
+
+    human_dict = {}
+    human_dict["Human_pose"] = {}
+
+    # Init object for the ZED camera
+    object    = sl.ObjectData()
+
+    while True:
+        print("HZ SLAM THREAD    :", 1/(time.time() - last_time))
+        last_time = time.time()
+
+        # GET IMAGE.
+        zed.grab(runtime)
+        zed.retrieve_image(image, sl.VIEW.LEFT)                             
+        
+        # CHECKING OBJECT DETECTION.
+        zed.retrieve_objects(objects, obj_runtime_param)                                        # get 3D objects detection.   
+        validation, i    = get_id_nearest_humain(objects)                                       # sort all object abd get the nearest.
+
+        # CREATE THE IMAGE WE WILL SEND.
+        image_draw       = image.get_data()
+
+        if validation:
+            if not human_selected:
+                index = 0
+                for obj in objects.object_list:
+                    humain        = obj.bounding_box_2d
+                    id            = obj.id
+                    point_A       = (int(humain[0][0]), int(humain[0][1]))
+                    point_B       = (int(humain[1][0]), int(humain[1][1]))
+                    point_C       = (int(humain[2][0]), int(humain[2][1]))
+                    point_D       = (int(humain[3][0]), int(humain[3][1]))
+                    color         = None
+
+                    human_poseA = np.asarray([point_A])
+                    human_poseD = np.asarray([point_D])
+
+                    human_pose = np.append(human_poseA, human_poseD)
+
+                    mat_tolist = human_pose.tolist()
+
+                    human_dict["Human_pose"][str(id)] = mat_tolist
+
+                    if index == i:
+                        color     = (   0,   0, 255)
+                        data_detection[0] = int((humain[0][0]+humain[1][0])/2) - (int(image_draw.shape[1]/2))
+                        data_detection[1] = obj.position[0]
+                        data_detection[2] = len(objects.object_list)
+                    else:
+                        color     = (   0, 255,   0)
+                    
+                    image_draw    = cv2.line(image_draw, point_A, point_B, color, 5)
+                    image_draw    = cv2.line(image_draw, point_B, point_C, color, 5)
+                    image_draw    = cv2.line(image_draw, point_C, point_D, color, 5)
+                    image_draw    = cv2.line(image_draw, point_D, point_A, color, 5)
+                    
+                    font          = cv2.FONT_HERSHEY_SIMPLEX
+                    fontScale     = 2
+                    fontColor     = (255,255,255)
+                    lineType      = 2
+
+                    middle_x      = (point_A[0] + point_B[0]) / 2
+                    middle_y      = (point_A[1] + point_D[1]) / 2
+
+                    cv2.putText(image_draw, str(id), 
+                        (int(middle_x), int(middle_y)), 
+                        font, 
+                        fontScale,
+                        fontColor,
+                        lineType)
+                    
+                    index += 1
+                
+                # print(human_dict)
+                # ref = db.reference('/')
+                # ref.set(human_dict)
+
+                json_msg = json.dumps(human_dict).encode('utf-8')
+                with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as opened_socket:
+                    opened_socket.setblocking(0)
+                    opened_socket.sendto(json_msg, SendAddress)
+
+                human_dict = {}
+                human_dict["Human_pose"] = {}
+                
+
+            if human_selected and check_if_search_id_is_present(id, objects): 
+                id = id_selected
+                objects.get_object_data_from_id(object, id)                         # return the object of the selected id
+                humain        = object.bounding_box_2d
+
+                point_A       = (int(humain[0][0]), int(humain[0][1]))
+                point_B       = (int(humain[1][0]), int(humain[1][1]))
+                point_C       = (int(humain[2][0]), int(humain[2][1]))
+                point_D       = (int(humain[3][0]), int(humain[3][1]))
+
+
+                human_poseA = np.asarray([point_A])
+                human_poseD = np.asarray([point_D])
+
+                human_pose = np.append(human_poseA, human_poseD)
+
+                mat_tolist = human_pose.tolist()
+
+                human_dict["Human_pose"][str(id)] = mat_tolist
+
+
+                color         = (255, 0, 0)
+                image_draw    = cv2.line(image_draw, point_A, point_B, color, 5)
+                image_draw    = cv2.line(image_draw, point_B, point_C, color, 5)
+                image_draw    = cv2.line(image_draw, point_C, point_D, color, 5)
+                image_draw    = cv2.line(image_draw, point_D, point_A, color, 5)
+
+                font          = cv2.FONT_HERSHEY_SIMPLEX
+                fontScale     = 2
+                fontColor     = (255,255,255)
+                lineType      = 2
+
+                middle_x      = (point_A[0] + point_B[0]) / 2
+                middle_y      = (point_A[1] + point_D[1]) / 2
+
+                # text = 'ID:' + str(id)
+                cv2.putText(image_draw, str(id), 
+                    (int(middle_x), int(middle_y)), 
+                    font, 
+                    fontScale,
+                    fontColor,
+                    lineType)
+
+                data_detection[0] = int((humain[0][0]+humain[1][0])/2) - (int(image_draw.shape[1]/2))
+                data_detection[1] = object.position[0]                                                          # WARING! Normalement il renvoie tout le temps une valeur valide.
+                data_detection[2] = len(objects.object_list)
+
+                json_msg = json.dumps(human_dict).encode('utf-8')
+                with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as opened_socket:
+                    opened_socket.setblocking(0)
+                    opened_socket.sendto(json_msg, SendAddress)
+
+
+                human_dict = {}
+                human_dict["Human_pose"] = {}
+        else:
+            data_detection    = np.zeros(3)  
+            
+
+        # RESIZE WINDOW OTHERWISE STREAM TO SLOW 
+        image_draw = cv2.resize(image_draw, (int(352), int(240)))
+
+        #CREATE A COPY OF THE IMAGE TO SEND IT IN ANOTHER THREAD OTHERWISE LOOSE A LOT OF FPS
+        with lock:
+            new_image = True
+        # copy_image_stream = image_draw.copy()
+        cv2.imshow("ZED", image_draw)
+        key = cv2.waitKey(5)
 
 if __name__ == "__main__":
     
@@ -535,8 +720,9 @@ if __name__ == "__main__":
     lock = threading.Lock()
 
     # # Thread human detection.
-    thread_1 = threading.Thread(target=thread_detection       , args=(params,))
-    thread_1.start()
+    # thread_1 = threading.Thread(target=thread_detection       , args=(params,))
+    # thread_1.start()
+
 
     # Thread pointcloud.
     # thread_2 = threading.Thread(target=thread_pointcloud        , args=(params,))
@@ -546,6 +732,10 @@ if __name__ == "__main__":
     # thread_3 = threading.Thread(target=both_thread_in_one     , args=(params,))
     # thread_3.start()
 
-    thread_1.join()
+    thread_4 = threading.Thread(target=thread_detection_firebase , args=(params,))
+    thread_4.start()
+    
+    # thread_1.join()
     # thread_2.join()
     # thread_3.join()
+    thread_4.join()

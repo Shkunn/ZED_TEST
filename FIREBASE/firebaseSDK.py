@@ -9,8 +9,6 @@ firebase_admin.initialize_app(cred, {
     'databaseURL': 'https://rexinterface-default-rtdb.europe-west1.firebasedatabase.app/'
 })
 
-""" 
-
 myDict = {}
   
 # # Adding list as value
@@ -35,7 +33,7 @@ myDict["Points"].extend(mat_tolist)
 
 # HUMAN POSE
 
-A = ['5', '10', '15', '20']
+A = ['8', '10', '15', '20']
 D = ['5', '10', '15', '20']
 mat_human = np.array([])
 mat_human = np.append(mat_human, A)
@@ -74,7 +72,7 @@ ref = db.reference('/')
 # })
 ref.set(myDict)
 
-"""
+
 
 #region updating
 
