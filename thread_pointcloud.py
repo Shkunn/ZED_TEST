@@ -29,8 +29,8 @@ data_detection     = np.zeros(3)                        # Format(axes y position
 human_selected     = False
 id_selected        = -1
 
-IP_send   = "172.21.72.126"
-PORT_send = 8080
+IP_send   = "172.21.72.151"
+PORT_send = 5000
 SendAddress = (IP_send, PORT_send)
 
 
@@ -44,8 +44,8 @@ def initialize():
     parser = argparse.ArgumentParser()
     parser.add_argument("debug", help="pass debug to 1 if you want more info")
     parser.add_argument("model", help="you can choose your model : 1 for HUMAN_BODY_FAST | 2 for MULTI_CLASS_BOX_MEDIUM | 3 for MULTI_CLASS_BOX")  
-    parser.add_argument("ip_server", help="ip adress of server")
-    parser.add_argument("ip_brain", help="ip adress of JETSON")
+    parser.add_argument("ip_server", help="ip address of server")
+    parser.add_argument("ip_brain", help="ip address of JETSON")
     args = parser.parse_args()
 
     # DEBUG OPTION.
@@ -810,14 +810,14 @@ if __name__ == "__main__":
     # thread_3 = threading.Thread(target=both_thread_in_one       , args=(params,))
     # thread_3.start()
 
-    # thread_4 = threading.Thread(target=thread_detection_socket    , args=(params,))
-    # thread_4.start()
+    thread_4 = threading.Thread(target=thread_detection_socket    , args=(params,))
+    thread_4.start()
 
-    thread_5 = threading.Thread(target=thread_pointcloud_firebase , args=(params,))
-    thread_5.start()
+    # thread_5 = threading.Thread(target=thread_pointcloud_firebase , args=(params,))
+    # thread_5.start()
     
     # thread_1.join()
     # thread_2.join()
     # thread_3.join()
-    # thread_4.join()
-    thread_5.join()
+    thread_4.join()
+    # thread_5.join()

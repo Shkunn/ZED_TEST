@@ -5,7 +5,7 @@ import json
 # Define the IP address and the Port Number
 IP    = "172.21.72.126"
 # IP    = "192.168.1.71"
-PORT  = 8080
+PORT  = 8081
 
 listeningAddress = (IP, PORT)
 
