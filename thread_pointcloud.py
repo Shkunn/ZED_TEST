@@ -15,6 +15,12 @@ from firebase_admin import credentials
 from firebase_admin import db   
 import json
 
+import socketio
+
+
+sio = socketio.Client(logger=True, engineio_logger=True)
+start_timer = None
+
 cred = credentials.Certificate('FIREBASE/firebase_SDK.json')
 firebase_admin.initialize_app(cred, {
     'databaseURL': 'https://rexinterface-default-rtdb.europe-west1.firebasedatabase.app/'
@@ -179,6 +185,12 @@ def initialize():
     # SEND PARAM.
     params = ParamsInit(zed, image, pose, ser, sock, runtime, pymesh, objects, obj_runtime_param)
     return params
+
+
+def send_data(data):
+    global start_timer
+    start_timer = time.time()
+    sio.emit('data', data)
 
 def thread_pointcloud(params):
 
@@ -714,10 +726,13 @@ def thread_detection_socket(params):
                     
                     index += 1
 
-                json_msg = json.dumps(human_dict).encode('utf-8')
-                with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as opened_socket:
-                    opened_socket.setblocking(0)
-                    opened_socket.sendto(json_msg, SendAddress)
+                # json_msg = json.dumps(human_dict).encode('utf-8')
+                # with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as opened_socket:
+                #     opened_socket.setblocking(0)
+                #     opened_socket.sendto(json_msg, SendAddress)
+                
+                json_msg = json.dumps(human_dict)
+                send_data(json_msg)
 
                 human_dict = {}
                 human_dict["Human_pose"] = {}
@@ -797,6 +812,8 @@ if __name__ == "__main__":
     
     params = initialize()
     lock = threading.Lock()
+    sio.connect('http://localhost:5000')
+
 
     # # Thread human detection.
     # thread_1 = threading.Thread(target=thread_detection         , args=(params,))
