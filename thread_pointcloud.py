@@ -35,9 +35,9 @@ data_detection     = np.zeros(3)                        # Format(axes y position
 human_selected     = False
 id_selected        = -1
 
-IP_send   = "172.21.72.151"
-PORT_send = 5000
-SendAddress = (IP_send, PORT_send)
+# IP_send   = "172.21.72.151"
+# PORT_send = 5000
+# SendAddress = (IP_send, PORT_send)
 
 
 def initialize():
@@ -785,11 +785,13 @@ def thread_detection_socket(params):
                 data_detection[1] = object.position[0]                                                          # WARING! Normalement il renvoie tout le temps une valeur valide.
                 data_detection[2] = len(objects.object_list)
 
-                json_msg = json.dumps(human_dict).encode('utf-8')
-                with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as opened_socket:
-                    opened_socket.setblocking(0)
-                    opened_socket.sendto(json_msg, SendAddress)
+                # json_msg = json.dumps(human_dict).encode('utf-8')
+                # with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as opened_socket:
+                #     opened_socket.setblocking(0)
+                #     opened_socket.sendto(json_msg, SendAddress)
 
+                json_msg = json.dumps(human_dict)
+                send_data(json_msg)
 
                 human_dict = {}
                 human_dict["Human_pose"] = {}
