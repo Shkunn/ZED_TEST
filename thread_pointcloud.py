@@ -16,10 +16,18 @@ from firebase_admin import db
 import json
 
 import socketio
+from flask import Flask, render_template
 
 
-sio = socketio.Client(logger=True, engineio_logger=True)
-start_timer = None
+# sio = socketio.Client(logger=True, engineio_logger=True)
+# start_timer = None
+
+async_mode = None
+
+sio = socketio.Server(async_mode='threading', cors_allowed_origins='*')
+app = Flask(__name__)
+app.wsgi_app = socketio.WSGIApp(sio, app.wsgi_app)
+
 
 cred = credentials.Certificate('FIREBASE/firebase_SDK.json')
 firebase_admin.initialize_app(cred, {
@@ -191,6 +199,44 @@ def send_data(data):
     global start_timer
     start_timer = time.time()
     sio.emit('data', data)
+
+@sio.event
+def ping_from_client(sid):
+    
+    myDict = {}
+    
+    # # Adding list as value
+    myDict["Human"] = {}
+
+    A = ['10', '15', '20', '30']
+
+    mat = np.array([])
+    mat = np.append(mat, A)
+
+    # for a in range(2):
+    #     mat = np.vstack([mat, A])
+
+
+    mat_tolist = mat.tolist()
+    myDict["Human"]["0"] = mat_tolist
+
+    b = json.dumps(myDict)
+
+    print("B: ", b)
+
+    sio.emit('pong_from_server', b, room=sid)
+
+def thread_server(param):
+    zed, image, pose, ser, sock, runtime, pymesh, objects, obj_runtime_param = params
+
+    if sio.async_mode == 'threading':
+
+        app.run(host='192.168.1.71',
+                port=5000)
+        
+    else:
+        print('Unknown async_mode: ' + sio.async_mode)
+
 
 def thread_pointcloud(params):
 
@@ -790,8 +836,6 @@ def thread_detection_socket(params):
                 #     opened_socket.setblocking(0)
                 #     opened_socket.sendto(json_msg, SendAddress)
 
-                json_msg = json.dumps(human_dict)
-                send_data(json_msg)
 
                 human_dict = {}
                 human_dict["Human_pose"] = {}
@@ -814,7 +858,7 @@ if __name__ == "__main__":
     
     params = initialize()
     lock = threading.Lock()
-    sio.connect('http://localhost:5000')
+    # sio.connect('http://localhost:5000')
 
 
     # # Thread human detection.
@@ -829,14 +873,18 @@ if __name__ == "__main__":
     # thread_3 = threading.Thread(target=both_thread_in_one       , args=(params,))
     # thread_3.start()
 
-    thread_4 = threading.Thread(target=thread_detection_socket    , args=(params,))
-    thread_4.start()
+    # thread_4 = threading.Thread(target=thread_detection_socket    , args=(params,))
+    # thread_4.start()
 
     # thread_5 = threading.Thread(target=thread_pointcloud_firebase , args=(params,))
     # thread_5.start()
+
+    thread_6 = threading.Thread(target=thread_server    , args=(params,))
+    thread_6.start()
     
     # thread_1.join()
     # thread_2.join()
     # thread_3.join()
-    thread_4.join()
+    # thread_4.join()
     # thread_5.join()
+    thread_6.join()
