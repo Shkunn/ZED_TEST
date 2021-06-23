@@ -51,9 +51,11 @@ def thead_create_mydict():
         b = json.dumps(myDict)
 
         # print("thead_create_mydict: ", b)
+
+        # print(i)
         
         i += 1
-        time.sleep(2)  
+        time.sleep(0.5)  
 
 
 @sio.event
@@ -66,11 +68,11 @@ def thread_server():
     if sio.async_mode == 'threading':
         # deploy with Werkzeug
         # app.run(threaded=True)
-        # app.run(host='172.21.72.133', 
-        #     port=5000)
+        app.run(host='172.21.72.133', 
+            port=5000)
 
-        app.run(host='192.168.1.71',
-                port=5000)
+        # app.run(host='192.168.1.71',
+        #         port=5000)
         
     else:
         print('Unknown async_mode: ' + sio.async_mode)
