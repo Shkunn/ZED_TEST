@@ -42,6 +42,7 @@ data_position      = np.zeros(3)
 data_detection     = np.zeros(3)                        # Format(axes y position, distance, nombre object)
 human_selected     = False
 id_selected        = -1
+data_msg           = {}
 
 # IP_send   = "172.21.72.151"
 # PORT_send = 5000
@@ -78,7 +79,7 @@ def initialize():
     init_params                      = sl.InitParameters()
     init_params.camera_resolution    = sl.RESOLUTION.HD720  # Use HD720 video mode
     init_params.coordinate_units     = sl.UNIT.METER         # Set coordinate units
-    init_params.coordinate_system    = sl.COORDINATE_SYSTEM.RIGHT_HANDED_Y_UP
+    init_params.coordinate_system    = sl.COORDINATE_SYSTEM.RIGHT_HANDED_Z_UP_X_FWD
     
     zed.open(init_params)
 
@@ -195,44 +196,63 @@ def initialize():
     return params
 
 
-def send_data(data):
-    global start_timer
-    start_timer = time.time()
-    sio.emit('data', data)
+# def send_data(data):
+#     global start_timer
+#     start_timer = time.time()
+#     sio.emit('data', data)
+
+@app.route('/')
+def index():
+    return render_template('latency.html')
+
+def thead_create_mydict():
+    global data_msg
+    # myDict = {}
+
+    i = 0
+
+    while i < 10000:
+    # # Adding list as value
+        myDict["Human"] = {}
+
+        A = [str(i), str(i+1), str(i+1), str(i+2)]
+
+        mat = np.array([])
+        mat = np.append(mat, A)
+
+        # for a in range(2):
+        #     mat = np.vstack([mat, A])
+
+
+        mat_tolist = mat.tolist()
+        myDict["Human"]["0"] = mat_tolist
+
+        data_msg = json.dumps(myDict)
+
+        # print("thead_create_mydict: ", b)
+
+        # print(i)
+        
+        i += 1
+        time.sleep(0.5)  
 
 @sio.event
 def ping_from_client(sid):
-    
-    myDict = {}
-    
-    # # Adding list as value
-    myDict["Human"] = {}
+    global data_msg
 
-    A = ['10', '15', '20', '30']
-
-    mat = np.array([])
-    mat = np.append(mat, A)
-
-    # for a in range(2):
-    #     mat = np.vstack([mat, A])
+    print(data_msg)
+    sio.emit('pong_from_server', data_msg, room=sid)
 
 
-    mat_tolist = mat.tolist()
-    myDict["Human"]["0"] = mat_tolist
-
-    b = json.dumps(myDict)
-
-    print("B: ", b)
-
-    sio.emit('pong_from_server', b, room=sid)
-
-def thread_server(param):
-    zed, image, pose, ser, sock, runtime, pymesh, objects, obj_runtime_param = params
-
+def thread_server():
     if sio.async_mode == 'threading':
 
-        app.run(host='192.168.1.71',
+        # app.run(host='172.21.72.126 ',
+        #         port=5000)
+        
+        app.run(host='192.168.255.107 ',
                 port=5000)
+        
         
     else:
         print('Unknown async_mode: ' + sio.async_mode)
@@ -695,7 +715,7 @@ def thread_detection_socket(params):
     """
 
     zed, image, pose, ser, sock, runtime, pymesh, objects, obj_runtime_param = params
-    global data_position, data_detection, keypoint_to_home, global_state, human_selected, id_selected, copy_image_stream, new_image, lock
+    global data_position, data_detection, keypoint_to_home, global_state, human_selected, id_selected, copy_image_stream, new_image, lock, data_msg
 
     # Init time to get the FPS 
     last_time = time.time()
@@ -734,9 +754,9 @@ def thread_detection_socket(params):
                     color         = None
 
                     human_poseA = np.asarray([point_A])
-                    human_poseD = np.asarray([point_D])
+                    human_poseC = np.asarray([point_C])
 
-                    human_pose = np.append(human_poseA, human_poseD)
+                    human_pose = np.append(human_poseA, human_poseC)
 
                     mat_tolist = human_pose.tolist()
 
@@ -777,8 +797,8 @@ def thread_detection_socket(params):
                 #     opened_socket.setblocking(0)
                 #     opened_socket.sendto(json_msg, SendAddress)
                 
-                json_msg = json.dumps(human_dict)
-                send_data(json_msg)
+                data_msg = json.dumps(human_dict)
+                # send_data(json_msg)
 
                 human_dict = {}
                 human_dict["Human_pose"] = {}
@@ -836,6 +856,7 @@ def thread_detection_socket(params):
                 #     opened_socket.setblocking(0)
                 #     opened_socket.sendto(json_msg, SendAddress)
 
+                data_msg = json.dumps(human_dict)
 
                 human_dict = {}
                 human_dict["Human_pose"] = {}
@@ -873,18 +894,22 @@ if __name__ == "__main__":
     # thread_3 = threading.Thread(target=both_thread_in_one       , args=(params,))
     # thread_3.start()
 
-    # thread_4 = threading.Thread(target=thread_detection_socket    , args=(params,))
-    # thread_4.start()
+    thread_4 = threading.Thread(target=thread_detection_socket    , args=(params,))
+    thread_4.start()
 
     # thread_5 = threading.Thread(target=thread_pointcloud_firebase , args=(params,))
     # thread_5.start()
 
-    thread_6 = threading.Thread(target=thread_server    , args=(params,))
+    thread_6 = threading.Thread(target=thread_server    , args=())
     thread_6.start()
+
+    # thread_7 = threading.Thread(target=thead_create_mydict    , args=())
+    # thread_7.start()
     
     # thread_1.join()
     # thread_2.join()
     # thread_3.join()
-    # thread_4.join()
+    thread_4.join()
     # thread_5.join()
     thread_6.join()
+    # thread_7.join()
